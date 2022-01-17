@@ -1,25 +1,25 @@
 const { Client } = require('pg');
 const axios = require("axios");
-const { json } = require('express');
+const { user } = require('pg/lib/defaults');
 
 const client = new Client({
-  host: 'ec2-34-197-135-44.compute-1.amazonaws.com',
-  database: 'd5rihqokl7rml4',
-  port: 5432,
-  user: 'kslhgnrsyjpziy',
-  password: 'e2f7eed33bca627d1b0261f171f2b329a934705ff1e619686c19c9eb3ff6ae39',
-  connectionString: 'postgres://kslhgnrsyjpziy:e2f7eed33bca627d1b0261f171f2b329a934705ff1e619686c19c9eb3ff6ae39@ec2-34-197-135-44.compute-1.amazonaws.com:5432/d5rihqokl7rml4',
-  ssl: {
-    rejectUnauthorized: false
-  }
+  host: process.env.DB_HOST,
+  database: process.env.DB_DATABASE,
+  port: process.env.DB_PORT,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  connectionString: process.env.DB_CONNECTIONSTRING,
+  ssl: { rejectUnauthorized: false }
 })
 client.connect()
 
-let rand = function () {
+let activeVerification = []
+
+const rand = function () {
   return Math.random().toString(36).substr(2);
 };
 
-let getRoles = async function (groupId) {
+const getRoles = async function (groupId) {
   let res = null;
   try {
     const data = await axios.get(`https://groups.roblox.com/v1/groups/${groupId}/roles`)
@@ -29,7 +29,44 @@ let getRoles = async function (groupId) {
   }
 }
 
-let getGroupData = async function (guildId) {
+const getVerificationStatus = function (userid) {
+  const checkNumber = function () { return userid }
+  if (typeof activeVerification.find(checkNumber) !== 'undefined') return true;
+  return false;
+}
+
+const startVerification = function(userid) {
+  if(!getVerificationStatus(userid)) activeVerification.push(userid);
+}
+
+const endVerification = function(userid) {
+  if(getVerificationStatus(userid)){
+    delete activeVerification[activeVerification.find(checkNumber)]
+  } else {
+    return null;
+  }
+}
+
+const getRobloxId = async function (discordid) {
+ let res = null;
+ try {
+    const data = await client.query("SELECT * FROM discordUsers WHERE discordid= " + discordid + ";")
+    res = data.rows[0].robloxid
+ } finally {
+    return res;
+ }
+}
+
+const setRobloxId = async function(discordid, robloxid) {
+  try{
+    await client.query("SELECT * FROM discordUsers WHERE discordid= " + discordid + ";")
+    client.query("UPDATE discordUsers SET robloxid='" + robloxid + "' WHERE discordid=" + discordid + ";")
+  } catch {
+    client.query("INSERT INTO discordUsers VALUES (" + discordid + ", '" + robloxid + "');").catch();
+  }
+}
+
+const getGroupData = async function (guildId) {
   let res = null;
   try {
     const data = await client.query("SELECT * FROM groupList WHERE guildid= " + guildId + ";")
@@ -39,11 +76,11 @@ let getGroupData = async function (guildId) {
   }
 }
 
-let setRoles = function(guildId, data){
+const setRoles = function(guildId, data){
   client.query("UPDATE groupList SET ranks='" + JSON.stringify(data).replace(/'/g, '`') + "' WHERE guildid=" + guildId + ";")
 }
 
-let getRoles = async function(guildId){
+const getGroupRoles = async function(guildId){
   let res = null;
   try {
     const data = await client.query("SELECT * FROM groupList WHERE guildid= " + guildId + ";")
@@ -53,7 +90,7 @@ let getRoles = async function(guildId){
   }
 }
 
-let setGroupData = async function(guildId, data) {
+const setGroupData = async function(guildId, data) {
   let res = null;
   try {
     let ranksArray = []
@@ -66,7 +103,7 @@ let setGroupData = async function(guildId, data) {
   }
 }
 
-let createNewGroup = async function (guildId, groupData) {
+const createNewGroup = async function (guildId, groupData) {
   let res = null;
   try {
     const token = rand() + rand() + rand() + rand()
@@ -81,13 +118,13 @@ let createNewGroup = async function (guildId, groupData) {
   }
 }
 
-let generateNewAuthToken = function (guildId) {
+const generateNewAuthToken = function (guildId) {
   const token = rand() + rand() + rand() + rand()
   client.query("UPDATE groupList SET token='" + token + "' WHERE guildid=" + guildId + ";")
   return token;
 }
 
-let getAuthToken = async function (guildId) {
+const getAuthToken = async function (guildId) {
   let res = null;
   try {
     const data = await client.query("SELECT * FROM groupList WHERE guildid= " + guildId + ";")
@@ -97,7 +134,7 @@ let getAuthToken = async function (guildId) {
   }
 }
 
-let updatePlayerData = function (token, newPlayerData) {
+const updatePlayerData = function (token, newPlayerData) {
   client.query("SELECT * FROM groupList WHERE token LIKE '%" + token + "%';", (err, res) => {
     if (err) throw err
     if (res.rowCount === 0) return null;
@@ -122,7 +159,7 @@ let updatePlayerData = function (token, newPlayerData) {
   });
 }
 
-let getPlayerData = async function (token, playerID) {
+const getPlayerData = async function (token, playerID) {
   let resData = null;
   try {
     res = await client.query("SELECT * FROM groupList WHERE token LIKE '%" + token + "%';");
@@ -136,6 +173,10 @@ let getPlayerData = async function (token, playerID) {
 }
 
 module.exports = {
+  startVerification,
+  endVerification,
+  getRobloxId,
+  setRobloxId,
   setRoles,
   getRoles,
   getGroupData,

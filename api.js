@@ -21,6 +21,15 @@ app.post('/getdata', function (req, res) {
     });
 })
 
+app.post('/reqverify', function (req, res) {
+    if (req.body.token === process.env.DEV_TOKEN){
+        
+        
+    } else {
+        res.send("Developer Token invalid! Informing the authorities...")
+    }
+})
+
 app.use(function (err, req, res, next) {
     console.error(err.stack)
     sendErr(res, {

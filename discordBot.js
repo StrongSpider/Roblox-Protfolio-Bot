@@ -33,4 +33,4 @@ client.once('ready', () =>{
 })
 
 client.on('error', console.error);
-client.login(require('./settings.json').token);
+client.login(process.env.TOKEN);
