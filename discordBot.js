@@ -1,36 +1,61 @@
-const { CommandoClient, util } = require('discord.js-commando');
-const path = require('path');
+const { getDiscordData, tokenFromGuild } = require('./functions/saveModule.js');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
+const { token } = require('./config.json').bot;
 
-const client = new CommandoClient({
-    commandPrefix: '!',
-    owner: '343751662592065537',
-    invite: 'https://discord.gg/7r2MJzVChS',
-  });
+const axios = require("axios");
+const fs = require('node:fs');
 
-client.registry
-  .registerDefaultTypes()
-  .registerGroups([
-      ['tester', 'Whoever has acsess to bot.'],
-  ])
-  .registerDefaultGroups()
-	.registerDefaultCommands(({
-		help: false, 
-		prefix: false, 
-		ping: false,
-		_eval: false,
-		unknownCommand: false, 
-		commandState: false
-		}))
-    .registerCommandsIn(path.join(__dirname, 'commands'))
+const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
-client.once('ready', () =>{
-    console.log(`Logged in as ${client.user.tag}! (${client.user.id})`);
-  client.user.setActivity('Testing out some commands...', {
-      type: 'PLAYING'
-    })
-    .then(presence => console.log(`Activity set to ${presence.activities[0].name}`))
-    .catch(console.error);
+const client = new Client({ intents: [GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.Guilds, GatewayIntentBits.GuildIntegrations]});
+client.commands = new Collection();
+
+for (const file of commandFiles) {
+	const command = require(`./commands/${file}`);
+	client.commands.set(command.data.name, command);
+}
+
+client.once('ready', () => {
+	client.guilds.cache.forEach(guild => tokenFromGuild(guild.id));
+});
+
+client.on('debug', (deb) => {
+	console.log(deb)
 })
 
-client.on('error', console.error);
-client.login(process.env.TOKEN);
+client.on('messageCreate', async (message) => {
+	if (message.author.bot) return;
+
+	const firebasetoken = await tokenFromGuild(message.guildId)
+	const discordData = await getDiscordData(firebasetoken)
+
+	for (var channel of discordData.live_channels) {
+		if (message.channelId === channel) {
+			discordData.experiences.forEach(id => {
+				axios.post(`https://apis.roblox.com/messaging-service/v1/universes/${id}/topics/PortfolioTopic`, { "message": `{ "content": "${message.content}", "user": "${message.member.user.tag}" }` }, {
+					headers: {
+						'x-api-key': discordData.roblox_api_key,
+						'Content-Type': 'application/json'
+					}
+				})
+			});
+			break;
+		}
+	}
+})
+
+client.on('interactionCreate', async interaction => {
+	if (!interaction.isChatInputCommand()) return;
+	const command = client.commands.get(interaction.commandName);
+
+	if (!command) return;
+
+	try {
+		await command.execute(interaction);
+	} catch (error) {
+		//await interaction.reply({ content: error.message, ephemeral: true });
+		throw error;
+	}
+});
+
+client.login(token);
