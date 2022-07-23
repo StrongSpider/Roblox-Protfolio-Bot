@@ -29,7 +29,10 @@ module.exports = {
         if (!interaction.member.permissions.has("MANAGE_GUILD")) { interaction.reply({ content: "You do not have permission to use this commmand.", ephemeral: true }); return; }
 
         const firebasetoken = await tokenFromGuild(interaction.guild.id)
-	    const discordData = await getDiscordData(firebasetoken)
+        const discordData = await getDiscordData(firebasetoken)
+
+        let dataExperience = discordData.experience
+        if (typeof dataExperience !== 'undefined') dataExperience = dataExperience.toString();
 
         const fields = [
             new TextInputBuilder()
@@ -46,12 +49,12 @@ module.exports = {
                 .setStyle(TextInputStyle.Short)
                 .setRequired(typeof discordData.roblox_api_key === 'undefined'),
             new TextInputBuilder()
-                .setCustomId('experiences')
+                .setCustomId('experience')
                 .setLabel('Experience ID connected to the API key 🎮')
                 .setPlaceholder('Enter your experience ID')
-                .setValue(discordData.experiences[0].toString() || '') // TODO: tostring might not work with or statment with undefined values
+                .setValue(dataExperience || '') // TODO: tostring might not work with or statment with undefined values
                 .setStyle(TextInputStyle.Short)
-                .setRequired(typeof discordData.experiences[0] === 'undefined')
+                .setRequired(typeof discordData.experience === 'undefined')
         ]
 
 
@@ -62,7 +65,7 @@ module.exports = {
 
         const modal = new ModalBuilder()
             .setCustomId('configModal')
-            .setTitle('Group Configeration 🔨🕵️‍♂️')  
+            .setTitle('Group Configeration 🔨🕵️‍♂️')
             .addComponents(components)
 
         await interaction.showModal(modal);
@@ -76,7 +79,7 @@ module.exports = {
 
         const groupid = parseInt(submitted.fields.getTextInputValue('groupid'));
         const apikey = submitted.fields.getTextInputValue('apikey');
-        const experiences = submitted.fields.getTextInputValue('experiences');
+        const experience = submitted.fields.getTextInputValue('experience');
 
         if (isNaN(groupid)) return submitted.reply({ content: "You need to enter a number!", ephemeral: true });
 
@@ -89,7 +92,7 @@ module.exports = {
         const embedFields = []
         const addField = (name, value, inline) => {
             inline = inline || false
-            embedFields.push({ name: name, value: value, inline: inline})
+            embedFields.push({ name: name, value: value, inline: inline })
         }
 
         var embed = new EmbedBuilder()
@@ -99,22 +102,22 @@ module.exports = {
             .setColor([0, 155, 255])
             .setTimestamp()
 
-            addField(`Roblox Group Name`, `[${groupData.name}](${makeLink(groupid, groupData.name)})`, true)
-            addField(`Roblox Group ID`, groupid.toString(), true)
-            addField(`Roblox Group Owner`, groupData.owner.username, true)
-            addField(`Discord Guild Name`, submitted.guild.name, true)
-            addField(`Discord Guild ID`, submitted.guildId, true)
-            addField(`Discord Guild Owner`, discordOwner.displayName, true)
+        addField(`Roblox Group Name`, `[${groupData.name}](${makeLink(groupid, groupData.name)})`, true)
+        addField(`Roblox Group ID`, groupid.toString(), true)
+        addField(`Roblox Group Owner`, groupData.owner.username, true)
+        addField(`Discord Guild Name`, submitted.guild.name, true)
+        addField(`Discord Guild ID`, submitted.guildId, true)
+        addField(`Discord Guild Owner`, discordOwner.displayName, true)
 
-            embed.addFields(embedFields)
+        embed.addFields(embedFields)
 
         setDiscordData(firebasetoken, {
             discord_id: submitted.guildId,
-            experiences: [ experiences ],
-            live_channels: discordData.live_channels,
-            roblox_api_key: apikey || discordData,
+            experience: experience,
+            live_channels: discordData.live_channels || '',
+            roblox_api_key: apikey || discordData.roblox_api_key || '',
             roblox_group_id: groupid,
-            users: discordData.users
+            users: discordData.users || []
         })
 
         submitted.reply({ embeds: [embed], ephemeral: true })

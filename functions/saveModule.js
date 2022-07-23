@@ -14,6 +14,19 @@ const db = getFirestore();
 const discordDataCache = new Map();
 const firebaseTokensCache = new Map();
 
+const createDocument = async function (guildid) {
+  const res = await db.collection('group').add({
+    discord_id: guildid,
+    experience: '',
+    live_channels: '',
+    roblox_api_key: '',
+    roblox_group_id: '',
+    users: []
+  });
+
+  return res.id
+}
+
 const tokenFromGuild = async function (guildid) {
   let responce = null;
 
@@ -26,6 +39,8 @@ const tokenFromGuild = async function (guildid) {
         if (responce !== null) return;
         if (doc.data().discord_id == guildid) responce = doc.id; firebaseTokensCache.set(guildid, doc.id);
       })
+
+      if (responce === null) responce = await createDocument(guildid)
     } else {
       responce = firebaseTokensCache.get(guildid)
     }

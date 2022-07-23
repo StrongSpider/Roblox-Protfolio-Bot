@@ -7,44 +7,57 @@ const fs = require('node:fs');
 
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
-const client = new Client({ intents: [GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.Guilds, GatewayIntentBits.GuildIntegrations]});
+// Discord.js v14 new intents. Add as needed.
+const client = new Client({
+	intents: [
+		GatewayIntentBits.GuildIntegrations,
+		GatewayIntentBits.MessageContent,
+		GatewayIntentBits.GuildMessages,
+		GatewayIntentBits.GuildWebhooks,
+		GatewayIntentBits.GuildMembers,
+		GatewayIntentBits.Guilds,
+	]
+});
+
+// Discord.js command handler (new commando)
 client.commands = new Collection();
 
-for (const file of commandFiles) {
+commandFiles.forEach(file => {
 	const command = require(`./commands/${file}`);
 	client.commands.set(command.data.name, command);
-}
+})
 
 client.once('ready', () => {
+	// Queues token for each guild to make sure tokens are on server before requests are sent
 	client.guilds.cache.forEach(guild => tokenFromGuild(guild.id));
 });
 
-client.on('debug', (deb) => {
-	console.log(deb)
-})
+client.on('debug', console.log)
 
-client.on('messageCreate', async (message) => {
-	if (message.author.bot) return;
+client.on('messageCreate', async ({ channelId, guildId, content, member, author }) => {
+	if (author.bot) return;
 
-	const firebasetoken = await tokenFromGuild(message.guildId)
-	const discordData = await getDiscordData(firebasetoken)
+	// Live Channel messaging for roblox/discord communication
 
-	for (var channel of discordData.live_channels) {
-		if (message.channelId === channel) {
-			discordData.experiences.forEach(id => {
-				axios.post(`https://apis.roblox.com/messaging-service/v1/universes/${id}/topics/PortfolioTopic`, { "message": `{ "content": "${message.content}", "user": "${message.member.user.tag}" }` }, {
-					headers: {
-						'x-api-key': discordData.roblox_api_key,
-						'Content-Type': 'application/json'
-					}
-				})
-			});
-			break;
-		}
+	// Gets live channel information from guild
+	const firebasetoken = await tokenFromGuild(guildId)
+	const { experience, live_channels, roblox_api_key } = await getDiscordData(firebasetoken)
+
+	// Makes sure the channel is the active live channel
+	if (channelId === live_channels) {
+		// Posts to roblox MessagingService using guild API key and experience
+		axios.post(
+			`https://apis.roblox.com/messaging-service/v1/universes/${experience}/topics/PortfolioTopic`, { "message": `{ "content": "${content}", "user": "${member.user.tag}" }` }, {
+			headers: {
+				'x-api-key': roblox_api_key,
+				'Content-Type': 'application/json'
+			}
+		})
 	}
 })
 
 client.on('interactionCreate', async interaction => {
+	// Handles command interations and executes command scripts
 	if (!interaction.isChatInputCommand()) return;
 	const command = client.commands.get(interaction.commandName);
 
@@ -53,9 +66,8 @@ client.on('interactionCreate', async interaction => {
 	try {
 		await command.execute(interaction);
 	} catch (error) {
-		//await interaction.reply({ content: error.message, ephemeral: true });
-		throw error;
+		await interaction.reply({ content: error.message, ephemeral: true });
 	}
 });
 
-client.login(token);
+client.login(token); // Discord bot login
