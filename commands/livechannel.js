@@ -17,28 +17,14 @@ module.exports = {
 
         if (toggle) {
             // Toggle On
-            setDiscordData(firebasetoken, {
-                discord_id: discordData.discord_id,
-                experience: discordData.experience || '',
-                live_channels: interaction.channel.id,
-                roblox_api_key: discordData.roblox_api_key || '',
-                roblox_group_id: discordData.roblox_group_id || '',
-                users: discordData.users || []
-            })
-
+            discordData.live_channels = interaction.channel.id
             await interaction.reply('This channel has been set up as a live roblox chat channel!');
         } else {
             // Toggle Off
-            setDiscordData(firebasetoken, {
-                discord_id: discordData.discord_id,
-                experience: discordData.experience || '',
-                live_channels: '',
-                roblox_api_key: discordData.roblox_api_key || '',
-                roblox_group_id: discordData.roblox_group_id || '',
-                users: discordData.users || []
-            })
-
+            discordData.live_channels = ''
             await interaction.reply('This channel has disabled its live messaging functionality!');
         }
+
+        setDiscordData(firebasetoken, discordData)
 	},
 };

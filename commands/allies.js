@@ -217,7 +217,6 @@ module.exports = {
                 initalCollector.on('end', _ => interaction.editReply({ embeds: [createPage(pageCount)] }));
             }
         } catch (err) {
-            console.log(err)
             interaction.editReply({ content: err.message});
         }
     },

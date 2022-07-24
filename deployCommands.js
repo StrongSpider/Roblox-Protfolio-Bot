@@ -4,6 +4,8 @@ const { Routes } = require('discord-api-types/v9');
 const { bot } = require('./config.json');
 const { clientId, guildId, token } = bot
 
+const flag = process.argv.indexOf('-g') > -1 ? 	Routes.applicationCommands(clientId): Routes.applicationGuildCommands(clientId, guildId);
+
 const commands = [];
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
 
@@ -18,7 +20,7 @@ const rest = new REST({ version: '9' }).setToken(token);
 		console.log('Started refreshing application (/) commands.');
 
 		await rest.put(
-			Routes.applicationGuildCommands(clientId, guildId),
+			flag,
 			{ body: commands },
 		);
 
